@@ -1,0 +1,10 @@
+# secret stuff
+# ================================================
+secrets.json
+ganache
+
+# Generated stuff
+# ================================================
+# /build
+/node_modules
+

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    <title>Syntropy</title>
+
+    <!-- Bootstrap -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
+      <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
+  </head>
+
+  <body>
+    <div class="container">
+      <div class="row">
+        <h1 class="text-center">Syntropy</h1>
+      </div>
+
+      <div id="solUSD" class="row">
+        <h3>SolUSD</h3>
+
+        <table>
+          <tr>
+            <td><strong>Balance </strong> </td>
+            <td><span id="SolUSDBalance"></span> USD</td>
+            <td></td>
+            <td></td>
+          </tr>
+          <tr>
+            <td><strong>Mint</strong></td>
+            <td>To address: <input type="text" class="form-control" id="SolUSDMintAddress" placeholder="To address" /></td>
+            <td>Amount: <input type="text" class="form-control" id="SolUSDMintAmount" placeholder="Amount" /></td>
+            <td><button class="btn btn-primary" id="solUSDMintButton" type="button">Mint</button></td>
+          </tr>
+          <tr>
+            <td><strong>Transfer</strong></td>
+            <td>To address: <input type="text" class="form-control" id="SolUSDTransferAddress" placeholder="To address" /></td>
+            <td>Amount: <input type="text" class="form-control" id="SolUSDTransferAmount" placeholder="Amount" /></td>
+            <td><button class="btn btn-primary" id="solUSDTransferButton" type="button">Transfer</button></td>
+          </tr>
+          <tr>
+            <td><strong>Approve</strong></td>
+            <td>To address: <input type="text" class="form-control" id="SolUSDApproveAddress" placeholder="To address" /></td>
+            <td>Amount: <input type="text" class="form-control" id="SolUSDApproveAmount" placeholder="Amount" /></td>
+            <td><button class="btn btn-primary" id="solUSDApproveButton" type="button">Approve</button></td>
+          </tr>
+        </table>
+
+        <br/>
+      </div>
+    
+      <div id="BorderFactory" class="row">
+        <h3>BorderFactory</h3>
+
+        Borders
+        <br/>
+        <span id="ListBorders"></span>
+        <br/>
+
+        <table>
+          <tr>
+            <td><strong>Create</strong></td>
+            <td>Name: <input type="text" class="form-control" id="BorderFactoryCreateName" placeholder="border name" /></td>
+            <td>Token name: <input type="text" class="form-control" id="BorderFactoryCreateTokenName" placeholder="token border name" /></td>
+            <td>Token symbol: <input type="text" class="form-control" id="BorderFactoryCreateTokenSymbol" placeholder="token border symbol" /></td>
+            <td><button class="btn btn-primary" id="borderFactoryCreateButton" type="button">Create</button></td>
+          </tr>
+        </table>
+
+        <br/>
+      </div>
+
+      <div id="MovimentFactory" class="row">
+        <h3>MovimentFactory</h3>
+
+        Moviments
+        <br/>
+        <span id="ListMoviments"></span>
+        <br/>
+
+        <table>
+          <tr>
+            <td><strong>Create</strong></td>
+            <td>Name: <input type="text" class="form-control" id="MovimentFactoryCreateName" placeholder="moviment name" /></td>
+            <td><button class="btn btn-primary" id="movimentFactoryCreateButton" type="button">Create</button></td>
+          </tr>
+        </table>
+
+        <br/>
+      </div>
+
+          
+      <div id="Moviment" class="row">
+          <h3>Moviment</h3>
+
+          Address: <span id="MovimentAddress"></span>   Name: <span id="MovimentName"></span>   
+          <br/>Owners <br/> <span id="ListMovimentOwners"></span>
+          <br/>Borders <br/> <span id="ListMovimentBorders"></span>
+          <br/>
+
+          <table>
+            <tr>
+              <td><strong>setRatioOwner</strong></td>
+              <td>To: <input type="text" class="form-control" id="MovimentSetRatioOwnerTo" placeholder="address to permanent transfer" /></td>
+              <td>Perc: <input type="text" class="form-control" id="MovimentSetRatioOwnerPerc" placeholder="% with 00, exemple 40% = 4000" /></td>
+              <td><button class="btn btn-primary" id="movimentSetRatioOwnerButton" type="button">setRatioOwner</button></td>              
+            </tr>
+            <tr>
+              <td><strong>setRatioShare</strong></td>
+              <td>From: <input type="text" class="form-control" id="MovimentSetRatioShareFrom" placeholder="address from share (temporarily)" /></td>
+              <td>To: <input type="text" class="form-control" id="MovimentSetRatioShareTo" placeholder="address to share (temporarily)" /></td>
+              <td>Perc: <input type="text" class="form-control" id="MovimentSetRatioSharePerc" placeholder="% with 00, exemple 25,50% = 2550" /></td>
+              <td><button class="btn btn-primary" id="movimentSetRatioShareButton" type="button">setRatioShare</button></td>
+            </tr>
+          </table>
+          <br/>
+          <table>
+            <tr>
+              <td><strong>reportIncoming</strong></td>
+              <td>Total value: <input type="text" class="form-control" id="MovimentReportIncomingValue" placeholder="total value entry" /></td>
+              <td>Description: <input type="text" class="form-control" id="MovimentReportIncomingDescription" placeholder="text description" /></td>
+              <td><button class="btn btn-primary" id="movimentReportIncomingButton" type="button">reportIncoming</button></td>
+            </tr>
+          </table>
+          <span id="movimentReportIncomingEvents"></span>
+          <br/><br/>
+          <table>
+            <tr>
+              <td><strong>borderIncoming</strong></td>
+              <td>Total value: <input type="text" class="form-control" id="MovimentBorderIncomingTotal" placeholder="total value entry" /></td>
+              <td>Border value: <input type="text" class="form-control" id="MovimentBorderIncomingBorderValue" placeholder="border value" /></td>
+              <td><button class="btn btn-primary" id="movimentBorderIncomingButton" type="button">borderIncoming</button></td>
+            </tr>
+          </table>
+          <span id="movimentBorderIncomingEvents"></span>
+          <br/><br/>
+
+        <br/>
+      </div>
+
+      <div id="Border" class="row">
+        <h3>Border</h3>
+
+        Address: <span id="BorderAddress"></span>   Name: <span id="BorderName"></span>   
+        <br/>
+        Owners
+        <br/>
+        <span id="ListBorderOwners"></span>
+        <br/><strong>Token </strong><br/>
+        Address: <span id="TokenBorderAddress"></span>   Name: <span id="TokenBorderName"></span>   
+        <br/>          
+
+        <table>
+          <tr>
+            <td><strong>Balance </strong> </td>
+            <td><span id="BorderTokenBalance"></span> <span id="BorderTokenSymbol"></span></td>
+            <td></td>
+            <td></td>
+          </tr>
+          <tr>
+            <td><strong>Transfer</strong></td>
+            <td>To address: <input type="text" class="form-control" id="BorderTokenTransferAddress" placeholder="To address" /></td>
+            <td>Amount: <input type="text" class="form-control" id="BorderTokenTransferAmount" placeholder="Amount" /></td>
+            <td><button class="btn btn-primary" id="borderTokenTransferButton" type="button">Transfer</button></td>
+          </tr>
+          <tr>
+            <td><strong>Approve</strong></td>
+            <td>To address: <input type="text" class="form-control" id="BorderTokenApproveAddress" placeholder="To address" /></td>
+            <td>Amount: <input type="text" class="form-control" id="BorderTokenApproveAmount" placeholder="Amount" /></td>
+            <td><button class="btn btn-primary" id="borderTokenApproveButton" type="button">Approve</button></td>
+          </tr>
+        </table>
+        <br/>
+        <span id="borderEventDepositUSD"></span>
+        <br/><br/>
+      </div>
+
+          
+      <div id="XXX" class="row">
+        <table>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+          </tr>
+        </table>
+
+        <br/>
+      </div>      
+
+
+    </div>
+
+
+    <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+    <!-- Include all compiled plugins (below), or include individual files as needed -->
+    <script src="js/bootstrap.min.js"></script>
+    <script src="js/web3.min.js"></script>
+    <script src="js/truffle-contract.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
