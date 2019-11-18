@@ -1,6 +1,7 @@
-pragma solidity 0.5.11;
+pragma solidity >=0.5.1 <0.6.0;
 
 // Syntropy By Solange Gueiros
+// versao 0.2.1
 
 
 contract Token {
@@ -339,16 +340,19 @@ contract Moviment {
     string public name;
     uint256 public decimalpercent = 10000;              //100.00 = precisão da porcentagem (2) + 2 casas para 100%
     address public creator;
-    address[] public owners;                            //Donos do movimento
+    address[] public owners;                            //Donos "permanentes" do movimento
+    address[] public shareOwners;                       //Donos "temporarios" do movimento, quando alguém compartilha sua parte temporariamente
     mapping (address => uint256) public indexOwner;     //posicao no array
-    mapping (address => uint256) public ratioOwner;
-    mapping (address => mapping (address => uint256)) public shareOwner; //% que cada nó encaminha para outro nó a partir deste movimento
-    
+    mapping (address => uint256) public ratioOwner;     // % total de cada nó, permanente
+
+    mapping (address => mapping (address => uint256)) public shareOwner; //% temporária que cada nó encaminha para outro nó a partir deste movimento
+    mapping (address => uint256) public indexShareOwner;     //posicao no array
+    mapping (address => uint256) public ratioShareOwner;     // % total de cada nó, temporário
+
     address[] public borders;                           //Bordas que recebem deste movimento
     mapping (address => uint256) public indexBorder;    //borda que recebe deste movimento - posicao no array
-    
     //ratioBorder é a % total que cada owner envia para a borda. Como é relativa a cada owner, o total pode ser mais de 100%
-    mapping (address => uint256) public ratioBorder;
+    mapping (address => uint256) public ratioBorder;    // % total de cada borda
     mapping (address => mapping (address => uint256)) public shareBorder; //% que cada nó encaminha para a borda a partir deste movimento
     
     //From BorderFactory
@@ -364,7 +368,9 @@ contract Moviment {
         indexOwner[_ownerAddress] = owners.push(_ownerAddress)-1;
         ratioOwner[_ownerAddress] = decimalpercent;
         shareOwner[_ownerAddress][_ownerAddress] = decimalpercent;
-        
+
+        shareOwners.push(address(0x0));  //posicao 0 zerada
+
         borderFactory = BorderFactory(_borderFactory);
         borders.push(address(0x0));  //posicao 0 zerada
         usdAddress = _usdAddress;
@@ -382,6 +388,10 @@ contract Moviment {
     function listBorders() public view returns (address[] memory) {
         return borders;
     }
+    
+    function listShareOwners() public view returns (address[] memory) {
+        return shareOwners;
+    }
 
     function inBorderFactory (address _address) public view returns (bool) {
         return borderFactory.inBorderFactory (_address);
@@ -393,6 +403,8 @@ contract Moviment {
     event SetBorderShare (address indexed _from, address indexed _to, uint256 _ratio);
     event AddOwner (address indexed _address);
     event RemoveOwner (address indexed _address);
+    event AddShareOwner (address indexed _address);
+    event RemoveShareOwner (address indexed _address);
     event AddBorder (address indexed _address);
     event RemoveBorder (address indexed _address);
 
@@ -407,13 +419,14 @@ contract Moviment {
             indexOwner[_address] = owners.push(_address)-1;
             emit AddOwner(_address);
         }
-        
+
         if (ratioOwner[msg.sender] == 0) {
             removeOwner (msg.sender);
         }
         
         //Atualiza o shareOwner
         shareOwner[_address][_address] = decimalpercent;
+        ratioShareOwner[_address] = decimalpercent;
         emit SetRatioOwner (msg.sender, _address, _ratio);
     }
 
@@ -428,24 +441,35 @@ contract Moviment {
         return true;
     }
 
+    function removeShareOwner(address _address) internal returns (bool) {
+        //Retirar do array ShareOwner
+        uint256 indexToDelete = indexShareOwner[_address];
+        address addressToMove = shareOwners[owners.length-1];
+        indexShareOwner[addressToMove] = indexToDelete;
+        shareOwners[indexToDelete] = addressToMove;
+        shareOwners.length--;
+        emit RemoveShareOwner(_address);
+        return true;
+    }
+
     function removeBorder(address _address) internal returns (bool) {
-        //Retirar do array Border        
+        //Retirar do array Border
         uint256 indexToDelete = indexBorder[_address];
         address addressToMove = borders[borders.length-1];
         indexBorder[addressToMove] = indexToDelete;
         borders[indexToDelete] = addressToMove;
         borders.length--;
-        emit RemoveBorder(_address);        
+        emit RemoveBorder(_address);
         return true;
     }
 
     function setRatioShare (address _from, address _to, uint256 _ratio) public onlyOwner  {
-        require(_ratio <= shareOwner[msg.sender][_from], "value greater than origin's share");
 
         //_from é uma borda?
         if (inBorderFactory(_from)) {
-            shareBorder[msg.sender][_from] = shareBorder[msg.sender][_from].sub(_ratio);
+            require(_ratio <= shareBorder[msg.sender][_from], "value greater than origin's share");
 
+            shareBorder[msg.sender][_from] = shareBorder[msg.sender][_from].sub(_ratio);
             ratioBorder[_from] = ratioBorder[_from].sub(ratioOwner[msg.sender].mul(_ratio).div(decimalpercent));
             if (ratioBorder[_from] == 0) {
                 //Significa que todos os owners retiraram sua parte para a borda.
@@ -454,10 +478,19 @@ contract Moviment {
             emit SetBorderShare (_from, _to, _ratio);
         }
         else {
+            require(_ratio <= shareOwner[msg.sender][_from], "value greater than origin's share");
+
             shareOwner[msg.sender][_from] = shareOwner[msg.sender][_from].sub(_ratio);
+            if (msg.sender != _from) {
+                ratioShareOwner[_from] = ratioShareOwner[_from].sub(ratioOwner[msg.sender].mul(_ratio).div(decimalpercent));
+                if (ratioShareOwner[_from] == 0) {
+                    //Significa que todos os owners retiraram sua parte para a borda.
+                    removeShareOwner (_from);
+                }
+            }
             emit SetRatioShare (_from, _to, _ratio);
         }
-        
+
         //_to é uma borda?
         if (inBorderFactory(_to)) {
             if (ratioBorder[_to] == 0) {
@@ -472,40 +505,107 @@ contract Moviment {
             emit SetBorderShare (_from, _to, _ratio);
         }
         else {
+            if (ratioShareOwner[_to] == 0) {
+                //O nó não recebia nada antes do movimento, então inclui o nó na lista que recebe deste movimento.
+                indexShareOwner[_to] = shareOwners.push(_to)-1;
+                emit AddShareOwner (_to);
+            }
+
             shareOwner[msg.sender][_to] = shareOwner[msg.sender][_to].add(_ratio);
+            ratioShareOwner[_to] = ratioShareOwner[_to].add(ratioOwner[msg.sender].mul(_ratio).div(decimalpercent));
             emit SetRatioShare (_from, _to, _ratio);
         }
     }
-    
-    
+
+
     event Incoming(address indexed from, uint256 value, string description);
     event BorderIncoming(address indexed from, address indexed to, uint256 value, string description);
     event ShareIncoming(address indexed from, address indexed to, uint256 value, string description);
 
     function reportIncoming (uint256 _value, string memory _description) public onlyOwner {
-        
+
         emit Incoming(msg.sender, _value, _description);
-        
+
         uint256 valueAux = 0;
-        
+
         for (uint256 o = 1; o < owners.length; o++) {
             //Aviso de entrada para as bordas
             for (uint256 b = 1; b < borders.length; b++) {
                 valueAux = _value.mul(ratioOwner[owners[o]]).div(decimalpercent).mul(shareBorder[owners[o]][borders[b]]).div(decimalpercent);
-
                 if (valueAux > 0)
                     emit BorderIncoming (owners[o], borders[b], valueAux, _description);
             }
-            
-            //Aviso de entrada para os nos
-            for (uint256 n = 1; n < owners.length; n++) {
-                valueAux = _value.mul(ratioOwner[owners[o]]).div(decimalpercent).mul(shareOwner[owners[o]][owners[n]]).div(decimalpercent);
 
+            valueAux = _value.mul(ratioOwner[owners[o]]).div(decimalpercent).mul(shareOwner[owners[o]][owners[o]]).div(decimalpercent);
+            if (valueAux > 0)
+                emit ShareIncoming (owners[o], owners[o], valueAux, _description);
+
+            //Aviso de entrada para os nos
+            for (uint256 n = 1; n < shareOwners.length; n++) {
+                valueAux = _value.mul(ratioOwner[owners[o]]).div(decimalpercent).mul(shareOwner[owners[o]][shareOwners[n]]).div(decimalpercent);
                 if (valueAux > 0)
-                    emit ShareIncoming (owners[o], owners[n], valueAux, _description);
+                    emit ShareIncoming (owners[o], shareOwners[n], valueAux, _description);
             }
         }
     }
+
+
+    event TransferToBorder(address indexed from, address indexed to, uint256 value, string description);
+    event TransferToOwner(address indexed from, address indexed to, uint256 value, string description);
+    event TransferToShare(address indexed from, address indexed to, uint256 value, string description);
+
+    function reportToTransfer (uint256 _value, string memory _description) public onlyOwner {
+
+        emit Incoming(msg.sender, _value, _description);
+
+        uint256 valueTotal = 0;
+        uint256 valueAux = 0;
+
+        // O que o sender tem que mandar para cada um (permanent owner), já subtraindo as bordas?
+        for (uint256 o = 1; o < owners.length; o++) {
+            valueTotal = 0;
+            for (uint256 b = 1; b < borders.length; b++) {
+                valueAux = _value.mul(ratioOwner[owners[o]]).div(decimalpercent).mul(shareBorder[owners[o]][borders[b]]).div(decimalpercent);
+                valueTotal = valueTotal.add(valueAux);
+            }
+
+            if (owners[o] == msg.sender) {
+                //Entrada para ele mesmo
+                valueAux = _value.mul(ratioOwner[owners[o]]).div(decimalpercent).mul(shareOwner[owners[o]][owners[o]]).div(decimalpercent);
+                emit TransferToOwner (msg.sender, owners[o], valueAux, _description);
+
+                //Aviso de entrada para os nos
+                for (uint256 n = 1; n < shareOwners.length; n++) {
+                    valueAux = _value.mul(ratioOwner[owners[o]]).div(decimalpercent).mul(shareOwner[owners[o]][shareOwners[n]]).div(decimalpercent);
+                    if (valueAux > 0)
+                        emit TransferToShare (owners[o], shareOwners[n], valueAux, _description);
+                }
+            }
+            else {
+                //Quando o sender não é o owner
+                valueAux = _value.mul(ratioOwner[owners[o]]).div(decimalpercent).sub(valueTotal);
+                emit TransferToOwner (msg.sender, owners[o], valueAux, _description);
+            }
+        }
+
+        //A partir do sender, verificar tudo o que ele tem que mandar para as bordas, mesmo em nome dos outros.
+        for (uint256 b = 1; b < borders.length; b++) {
+            valueTotal = 0;
+
+            for (uint256 o = 1; o < owners.length; o++) {
+                //Verifica se o owner quer enviar para a borda
+                if (shareBorder[owners[o]][borders[b]] > 0) {
+                    valueAux = _value.mul(ratioOwner[owners[o]]).div(decimalpercent).mul(shareBorder[owners[o]][borders[b]]).div(decimalpercent);
+                    valueTotal = valueTotal.add(valueAux);
+                }
+            }
+            if (valueTotal > 0){
+                emit TransferToBorder (msg.sender, borders[b], valueTotal, _description);
+            }
+        }
+
+    }
+
 
     address[] private borderFroms;
     uint256[] private borderValues;
@@ -516,40 +616,44 @@ contract Moviment {
         Border border;
         require(solUSD.transferFrom(msg.sender, address(this), _borderAmount), "Can not transfer to moviment");
 
-        uint256 valueTotal = 0;
-        uint256 valueAux = 0;
+        //valueTotal, valueBorder, valueAux;
+        uint256[3] memory valuesAux;
+        valuesAux[0] = 0;
+        valuesAux[1] = 0;
+        valuesAux[2] = 0;
 
         for (uint256 b = 1; b < borders.length; b++) {
-            valueTotal = 0;
+            valuesAux[1] = 0;
 
             for (uint256 o = 1; o < owners.length; o++) {
                 //Verifica se o owner quer enviar para a borda
                 if (shareBorder[owners[o]][borders[b]] > 0) {
-                    //valueAux = _total * ratioOwner[owners[o]] / decimalpercent * shareBorder[owners[o]][borders[b]] / decimalpercent;
-                    valueAux = _total.mul(ratioOwner[owners[o]]).div(decimalpercent).mul(shareBorder[owners[o]][borders[b]]).div(decimalpercent);
-                    valueTotal = valueTotal.add(valueAux);
+                    valuesAux[2] = _total.mul(ratioOwner[owners[o]]).div(decimalpercent).mul(shareBorder[owners[o]][borders[b]]).div(decimalpercent);
+                    valuesAux[1] = valuesAux[1].add(valuesAux[2]);
 
                     borderFroms.push(owners[o]);
-                    borderValues.push(valueAux);
+                    borderValues.push(valuesAux[2]);
                 }
             }
 
-            if (valueTotal > 0) {
-                solUSD.approve(borders[b], valueTotal);
+            if (valuesAux[1] > 0) {
+                valuesAux[0] = valuesAux[0].add(valuesAux[1]);
+                solUSD.approve(borders[b], valuesAux[1]);
                 border = Border(borders[b]);
-                border.depositUSD (valueTotal, borderFroms, borderValues);
+                border.depositUSD (valuesAux[1], borderFroms, borderValues);
             }
 
-            for (uint256 i = borderFroms.length-1; i <= 0; i--) {
-                delete borderFroms[i];
-                delete borderValues[i];
-                borderFroms.length--;
-                borderValues.length--;
-            }
+            delete borderFroms;
+            delete borderValues;
         }
 
+        //Sobrou troco? devolve para o sender
+        valuesAux[2] = _borderAmount.sub(valuesAux[0]);
+        if (valuesAux[2] > 0) {
+            solUSD.transfer(msg.sender, valuesAux[2]);
+        }
     }
-    
+
 }
 
 
@@ -648,4 +752,3 @@ library SafeMath {
         return a % b;
     }
 }
-
