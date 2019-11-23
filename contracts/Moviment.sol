@@ -1,7 +1,7 @@
-pragma solidity >=0.5.1 <0.6.0;
+pragma solidity 0.5.11;
 
 // Syntropy By Solange Gueiros
-// versao 0.2.1
+// versao 0.2.2
 
 
 contract Token {
@@ -145,31 +145,44 @@ contract TokenBorder is Token {
     uint8 private constant decimals_ = 4;
     address public owner;
 
-    constructor (string memory _name, string memory _symbol, address _sender)
+    constructor (string memory _name, string memory _symbol)
         public Token(_name, _symbol, decimals_) {
-        owner = _sender;
+        owner = msg.sender;
     }
-    
+
     function transfer(address to, uint256 value) public returns (bool) {
         _transfer(msg.sender, to, value);
-        
+
         //Atualiza proporcoes na Borda
         Border border = Border(owner);
         //border.updateRatio();
-        
+
         if (! border.isOwner(to)) {
             border.addOwner(to);
         }
-        
+
         for (uint256 i = 0; i < border.countOwners(); i++) {
             address addressAux = border.getOwner(i);
             uint256 ratio = balanceOf(addressAux).mul(border.decimalpercent());
             ratio = ratio.div(totalSupply());
             border.setRatioOwner(addressAux, ratio);
         }
-        
+
         return true;
     }
+
+    modifier onlyOwner() {
+        require((msg.sender == owner), "Only owner");
+        _;
+    }
+
+    //function mint(address to, uint256 value) public onlyMinter returns (bool) {
+    function mint(address to, uint256 value) public onlyOwner returns (bool) {
+        require(msg.sender == owner, "TokenBorder mint: only border can mint token");
+        _mint(to, value);
+        return true;
+    }
+
 }
 
 contract Border {
@@ -190,7 +203,8 @@ contract Border {
     constructor(string memory _name, string memory _tokenName, string memory _tokenSymbol, address _usdAddress, address _ownerAddress) public {
         creator = _ownerAddress;
         name = _name;
-        tokenBorder = new TokenBorder (_tokenName, _tokenSymbol, creator);
+    
+        tokenBorder = new TokenBorder (_tokenName, _tokenSymbol);
         usdAddress = _usdAddress;
 
         owners.push(_ownerAddress);
@@ -295,7 +309,7 @@ contract Border {
 
 contract BorderFactory {
     // Syntropy By Solange Gueiros
-    
+
     address[] public borders;
     mapping (address => bool) public isBorder;
     address public usdAddress;
@@ -320,14 +334,12 @@ contract BorderFactory {
     event CreateBorder (address indexed _address, string _name);
 
     function createBorder (string memory _name, string memory _tokenName, string memory _tokenSymbol) public returns (Border) {
-    //function createBorder (string memory _name, string memory _tokenName, string memory _tokenSymbol) public returns (address) {
         Border border = new Border (_name, _tokenName, _tokenSymbol, usdAddress, msg.sender);
+
         borders.push(address(border));
         isBorder[address(border)] = true;
         emit CreateBorder (address(border), _name);
-        //return address(border);
         return border;
-        //return lastBorderCreated();
     }
 
 }
