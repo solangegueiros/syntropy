@@ -1,20 +1,17 @@
 {
-  "name": "syntropy",
-  "version": "1.0.0",
+  "name": "Syntropy",
+  "version": "0.3.0",
   "description": "",
   "main": "truffle-config.js",
   "directories": {
     "test": "test"
   },
   "scripts": {
-    "dev": "lite-server",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "clear && truffle test"
   },
   "keywords": [],
-  "author": "Solange Gueiros",
-  "license": "ISC",
-  "dependencies": {
-    "lite-server": "^2.5.4",
-    "openzeppelin-solidity": "^2.2.0"
-  }
+  "author": "Solange Gueiros <solangegueiros@gmail.com> (https://solange.dev)",
+  "license": "MIT",
+  "repository": "github:solangegueiros/syntropy",
+  "bugs": "https://github.com/solangegueiros/syntropy/issues",  
 }
