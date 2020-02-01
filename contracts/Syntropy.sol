@@ -45,7 +45,7 @@ contract Token {
 
     function allowance(address owner, address spender) public view returns (uint256) {
         return _allowed[owner][spender];
-    }    
+    }
 
     function transfer(address to, uint256 value) public returns (bool) {
         _transfer(msg.sender, to, value);
@@ -61,7 +61,7 @@ contract Token {
         _transfer(from, to, value);
         _approve(from, msg.sender, _allowed[from][msg.sender].sub(value));
         return true;
-    }    
+    }
 
     function increaseAllowance(address spender, uint256 addedValue) public returns (bool) {
         _approve(msg.sender, spender, _allowed[msg.sender][spender].add(addedValue));
@@ -78,15 +78,6 @@ contract Token {
         _mint(to, value);
         return true;
     }
-
-    function burn(uint256 value) public {
-        _burn(msg.sender, value);
-    }
-
-    function burnFrom(address from, uint256 value) public {
-        _burnFrom(from, value);
-    }    
-
 
     event Transfer(address indexed from, address indexed to, uint256 value);
 
@@ -108,14 +99,6 @@ contract Token {
         emit Transfer(address(0), account, value);
     }
 
-    function _burn(address account, uint256 value) internal {
-        require(account != address(0));
-
-        _totalSupply = _totalSupply.sub(value);
-        _balances[account] = _balances[account].sub(value);
-        emit Transfer(account, address(0), value);
-    }
-
     function _approve(address owner, address spender, uint256 value) internal {
         require(spender != address(0));
         require(owner != address(0));
@@ -124,10 +107,6 @@ contract Token {
         emit Approval(owner, spender, value);
     }
 
-    function _burnFrom(address account, uint256 value) internal {
-        _burn(account, value);
-        _approve(account, msg.sender, _allowed[account][msg.sender].sub(value));
-    }
 
 }
 
@@ -149,7 +128,7 @@ contract Border {
     address public usdAddress;
 
     uint256 public decimalpercent = 10000;                  //100.00 = precisão da porcentagem (2) + 2 casas para 100%
-    uint32  public constant MaxAccount = 49;                //Número máximo de transferencias / depósitos em batch
+    uint8  public constant MaxAccount = 49;                //Número máximo de transferencias / depósitos em batch
 
     mapping (address => uint256) public ratioOwner;
     address[] public owners;
@@ -163,9 +142,7 @@ contract Border {
     constructor(string memory _name, address _usdAddress, address _ownerAddress) public {
         creator = _ownerAddress;
         name = _name;
-    
         usdAddress = _usdAddress;
-
         totalRatio = 0;
         _valueDeposited = 0;
     }
@@ -190,11 +167,10 @@ contract Border {
     }
 
     function _addOwner(address account, uint256 shareRatio) internal returns (bool) {
-        require(account != address(0), "PaymentSplitter: account is the zero address");
-        require(shareRatio > 0, "PaymentSplitter: shares are 0");
+        require(account != address(0), "zero address");
+        require(shareRatio > 0, "shares are 0");
 
         if (indexOwner[account] == 0) {
-        //if (ratioOwner[account] == 0) {
             indexOwner[account] = owners.push(account)-1;
             ratioOwner[account] = shareRatio;
             emit AddOwner(account, shareRatio);
@@ -225,14 +201,14 @@ contract Border {
     event DepositUSD(uint256 _totalValue, address[] indexed _froms, uint256[] _values);
 
     function depositUSD(uint256 _totalValue, address[] memory _froms, uint256[] memory _values) public {
-        require(_froms.length == _values.length, "Amount of recipients and values don't match");
-        require(_froms.length < MaxAccount, "Too many recipients");
+        require(_froms.length == _values.length, "number froms and values don't match");
+        require(_froms.length < MaxAccount, "too many recipients");
 
 
         UsdS usdS = UsdS(usdAddress);
         //A soma dos valores não pode ser maior que o allowance
-        require(_totalValue >= usdS.allowance(msg.sender, address(this)), "Ammount not approved");
-        require(usdS.transferFrom(msg.sender, address(this), _totalValue), "Can not transfer to border");
+        require(_totalValue >= usdS.allowance(msg.sender, address(this)), "ammount not approved");
+        require(usdS.transferFrom(msg.sender, address(this), _totalValue), "Can't transfer to border");
 
         emit DepositUSD(_totalValue, _froms, _values);
 
@@ -258,7 +234,7 @@ contract Border {
     event ReleaseUSD(address indexed to, uint256 value);
 
     function _releaseUSD(address account) internal {
-        require(ratioOwner[account] > 0, "Border: account has no shares");
+        require(ratioOwner[account] > 0, "no shares");
 
         uint256 payment = _valueDeposited.mul(ratioOwner[account]).div(totalRatio);
         _balances[account] = _balances[account].add(payment);
@@ -272,12 +248,13 @@ contract Border {
 
     //Withdrawal USD in the contract in behalf of msg.sender
     function withdrawalUSD() public {
-        require(_balances[msg.sender] > 0, "Border: balance account is zero");
+        require(_balances[msg.sender] > 0, "balance is zero");
 
         uint256 value = _balances[msg.sender];
         _balances[msg.sender] = 0;
         UsdS usdS = UsdS(usdAddress);
         require(usdS.transfer(msg.sender, value), "usdS transfer error");
+        delete value;
     }
 
     //Token Border equivalent
@@ -290,15 +267,15 @@ contract Border {
 
     //Transfer a amount of your part in Border to another account
     function transferRatio(address account, uint256 shareRatio) public {
-        require(account != address(0), "Border: account is the zero address");
-        require(shareRatio > 0, "Border: shares are 0");
+        require(account != address(0), "zero address");
+        require(shareRatio > 0, "shares are 0");
 
         //Não estou verificado se ele quer transferir mais do que tem, simplesmente vai dar erro no sub.
         uint256 newRatio = ratioOwner[msg.sender].sub(shareRatio);
 
         //Se ratioOwner[msg.sender] = 0, retiro do array para não passar por ele sem necessidade
         if (newRatio == 0) {
-            require(_removeOwner(msg.sender), "RemoveOwner error");
+            require(_removeOwner(msg.sender), "removeOwner error");
             //_removeOwner(msg.sender);
         }
 
@@ -391,7 +368,6 @@ contract Moviment {
         borderFactory = BorderFactory(_borderFactory);
         borders.push(address(0x0));  //posicao 0 zerada
         accountsIn.push(address(0x0));  //posicao 0 zerada
-                
         owners.push(address(0x0));  //posicao 0 zerada
         indexOwner[_ownerAddress] = owners.push(_ownerAddress)-1;
 
@@ -475,7 +451,6 @@ contract Moviment {
     event ShareDecrease (address indexed _from, address indexed _to, uint256 _ratio);
 
     function shareIncrease(address _account, uint _ratio) public onlyOwner {
-        
         TypeShare _accountType;
 
         if (isBorder(_account) && !inBorderList(_account)) {
@@ -488,12 +463,13 @@ contract Moviment {
         }
 
         _shareIncrease(_account, _ratio, _accountType);
+        delete _accountType;
     }
 
     function _shareIncrease(address _account, uint _ratio, TypeShare _accountType) internal {
         uint256 from = shareIndex[msg.sender][msg.sender];
         uint256 ratio = ownerShare[from].ratio;
-        require(ratio >= _ratio, "value greater than owner share");
+        require(ratio >= _ratio, "greater than owner share");
 
         ownerShare[from].ratio = ownerShare[from].ratio.sub(_ratio);
 
@@ -531,12 +507,15 @@ contract Moviment {
             delShareStruct(from);
         }
         emit ShareIncrease(msg.sender, _account, _ratio);
+        delete from;
+        delete to;
+        delete ratio;
     }
 
     function shareDecrease(address _account, uint _ratio) public onlyOwner {
         uint256 to = shareIndex[msg.sender][_account];
         uint256 ratio = ownerShare[to].ratio;
-        require(ratio >= _ratio, "value greater than account's share");
+        require(ratio >= _ratio, "greater than account's share");
 
         ownerShare[to].ratio = ownerShare[to].ratio.sub(_ratio);
 
@@ -565,6 +544,9 @@ contract Moviment {
             }
         }
         emit ShareDecrease(msg.sender, _account, _ratio);
+        delete from;
+        delete to;
+        delete ratio;        
     }
 
 
@@ -576,8 +558,11 @@ contract Moviment {
     event RemoveOwner (address indexed _address);
 
     modifier onlyOwner {
-        require(indexOwner[msg.sender] > 0, "Only owner");
+        _onlyOwner();
         _;
+    }
+    function _onlyOwner() internal view {
+        require(indexOwner[msg.sender] > 0, "only owner");
     }
 
     function inOwnerList (address _address) public view returns (bool) {
@@ -604,6 +589,8 @@ contract Moviment {
         owners.length--;
         indexOwner[_address] = 0;
         emit RemoveOwner(_address);
+        delete indexToDelete;
+        delete addressToMove;
         return true;
     }
 
@@ -611,11 +598,11 @@ contract Moviment {
 
     function ownerTransfer(address _account, uint _ratio) public onlyOwner {
         //_account não pode ser uma borda
-        require(!isBorder(_account), "Border can not have a RatioOwner");
+        require(!isBorder(_account), "is Border");
 
         uint256 from = shareIndex[msg.sender][msg.sender];
         uint256 ratio = ownerShare[from].ratio;
-        require(ratio >= _ratio, "value greater than owner share");
+        require(ratio >= _ratio, "greater than owner share");
         ownerShare[from].ratio = ownerShare[from].ratio.sub(_ratio);
 
         uint256 to = shareIndex[_account][_account];
@@ -634,6 +621,9 @@ contract Moviment {
             removeOwner(msg.sender);
         }
         emit OwnerTransfer(msg.sender, _account, _ratio);
+        delete from;
+        delete to;
+        delete ratio;
     }
 
     function listOwners() public view returns (address[] memory) {
@@ -673,6 +663,8 @@ contract Moviment {
         borders.length--;
         indexBorder[_address] = 0;
         emit RemoveBorder(_address);
+        delete indexToDelete;
+        delete addressToMove;
         return true;
     }
 
@@ -709,6 +701,8 @@ contract Moviment {
         accountsIn.length--;
         indexAccountIn[_address] = 0;
         emit RemoveAccountIn(_address);
+        delete indexToDelete;
+        delete addressToMove;
         return true;
     }
 
@@ -720,7 +714,7 @@ contract Moviment {
         //Fazer o approve do USD, para que seja distribuido aqui
         UsdS usdS = UsdS(usdAddress);
         Border border;
-        require(usdS.transferFrom(msg.sender, address(this), _borderAmount), "Can not transfer to moviment");
+        require(usdS.transferFrom(msg.sender, address(this), _borderAmount), "can not transfer to moviment");
 
         //E se o _borderAmount não é suficiente?
 
@@ -759,7 +753,7 @@ contract Moviment {
 
     // ACCOUNTS IN
     function shareIncreaseIn(address _account, uint _ratio) public onlyOwner {
-        require (!isBorder(_account), "shareIncreaseIn is not to borders");
+        require (!isBorder(_account), "is border");
 
         TypeShare _accountType;
         _accountType = TypeShare.In;
@@ -774,9 +768,8 @@ contract Moviment {
         UsdS usdS = UsdS(usdAddress);
         require(usdS.transferFrom(msg.sender, address(this), _accountAmount), "Can not transfer to moviment");
         //USD agora está armazenado no moviment
-        
+
         //E se o _accountAmount não é suficiente?
-        
         uint256 totalTransfer = 0;
         for (uint256 a = 1; a < accountsIn.length; a++) {
             uint256 totalAmount = 0;
@@ -805,15 +798,17 @@ contract Moviment {
 
     //Withdrawal USD in the contract in behalf of msg.sender
     function withdrawalUSD() public {
-        require(_balances[msg.sender] > 0, "Moviment: balance account is zero");
+        require(_balances[msg.sender] > 0, "balance is zero");
 
         uint256 value = _balances[msg.sender];
         _balances[msg.sender] = 0;
         UsdS usdS = UsdS(usdAddress);
         require(usdS.transfer(msg.sender, value), "usdS transfer error");
+        delete value;
     }
 
 
+    /*
     event Incoming(address indexed from, uint256 value, string description);
     event AnnounceBorderIncoming(address indexed from, address indexed to, uint256 value, string description);
     event AnnounceShareIncoming(address indexed from, address indexed to, uint256 value, TypeShare accountType, string description);
@@ -874,6 +869,9 @@ contract Moviment {
 
         return (totalBorders, totalAccountIns) ;
     }
+    */
+
+
 
 }
 
@@ -882,28 +880,16 @@ contract MovimentFactory {
 
     address public usdAddress;
     address public borderFactory;
-    address[] public moviments;
-    mapping (address => bool) public isMoviment;
 
     constructor(address _usdAddress, address _borderFactory) public {
         usdAddress = _usdAddress;
         borderFactory = _borderFactory;
     }
 
-    function inMovimentFactory (address _address) public view returns (bool) {
-        return (isMoviment[_address]);
-    }
-
-    function listMoviments() public view returns (address[] memory) {
-        return moviments;
-    }
-
     event CreateMoviment (address indexed _address, string _name);
 
     function createMoviment (string memory _name) public returns (address) {
         Moviment moviment = new Moviment (_name, borderFactory, usdAddress, msg.sender);
-        moviments.push(address(moviment));
-        isMoviment[address(moviment)] = true;
         emit CreateMoviment (address(moviment), _name);
         return address(moviment);
     }
@@ -914,59 +900,34 @@ contract MovimentFactory {
 library SafeMath {
     //By OpenZeppelin
 
-    /**
-     * @dev Multiplies two unsigned integers, reverts on overflow.
-     */
     function mul(uint256 a, uint256 b) internal pure returns (uint256) {
-        // Gas optimization: this is cheaper than requiring 'a' not being zero, but the
-        // benefit is lost if 'b' is also tested.
-        // See: https://github.com/OpenZeppelin/openzeppelin-solidity/pull/522
         if (a == 0) {
             return 0;
         }
 
         uint256 c = a * b;
         require(c / a == b);
-
         return c;
     }
 
-    /**
-     * @dev Integer division of two unsigned integers truncating the quotient, reverts on division by zero.
-     */
     function div(uint256 a, uint256 b) internal pure returns (uint256) {
-        // Solidity only automatically asserts when dividing by 0
         require(b > 0);
         uint256 c = a / b;
-        // assert(a == b * c + a % b); // There is no case in which this doesn't hold
-
         return c;
     }
 
-    /**
-     * @dev Subtracts two unsigned integers, reverts on overflow (i.e. if subtrahend is greater than minuend).
-     */
     function sub(uint256 a, uint256 b) internal pure returns (uint256) {
         require(b <= a);
         uint256 c = a - b;
-
         return c;
     }
 
-    /**
-     * @dev Adds two unsigned integers, reverts on overflow.
-     */
     function add(uint256 a, uint256 b) internal pure returns (uint256) {
         uint256 c = a + b;
         require(c >= a);
-
         return c;
     }
 
-    /**
-     * @dev Divides two unsigned integers and returns the remainder (unsigned integer modulo),
-     * reverts when dividing by zero.
-     */
     function mod(uint256 a, uint256 b) internal pure returns (uint256) {
         require(b != 0);
         return a % b;
