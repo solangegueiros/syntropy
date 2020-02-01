@@ -3,10 +3,19 @@ Syntropy Project
 
 ## FrondEnd Install
 
+O frontend não está atualizado em relação as ultimas versao dos contratos
+
 npm install
 
 npm run dev
 
+## Ropsten addresses
+
+### Border Factory
+0x47c7e3752e1fee1ac2707348fcda294f4d018d6d
+
+### Moviment Factory
+0xA16838CeBbbB032e6CE87e2D17737053eF22bda7
 
 
 ## Remix
