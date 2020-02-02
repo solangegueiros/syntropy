@@ -1,7 +1,8 @@
 pragma solidity 0.5.11;
+//pragma experimental ABIEncoderV2;
 
 // Syntropy By Solange Gueiros
-// versao 0.3.0
+// versao 0.3.1
 
 
 contract Token {
@@ -127,7 +128,7 @@ contract Border {
     address public creator;
     address public usdAddress;
 
-    uint256 public decimalpercent = 10000;                  //100.00 = precisão da porcentagem (2) + 2 casas para 100%
+    uint256 internal constant decimalpercent = 10000;                  //100.00 = precisão da porcentagem (2) + 2 casas para 100%
     uint8  public constant MaxAccount = 49;                //Número máximo de transferencias / depósitos em batch
 
     mapping (address => uint256) public ratioOwner;
@@ -323,20 +324,9 @@ contract BorderFactory {
 
 }
 
+library SyntropyStruct {
 
-
-contract Moviment {
-    using SafeMath for uint256;
-    // Syntropy By Solange Gueiros
-    
-    string public name;
-    uint256 public decimalpercent = 10000;              //100.00 = precisão da porcentagem (2) + 2 casas para 100%
-    address public creator;
-    uint32  public constant MaxAccountIn = 277;             //Número máximo de transferencias / depósitos em batch
-    
-    BorderFactory public borderFactory;                 //From BorderFactory
-    address public usdAddress;
-
+    //enum TypeShare {Out = 0, In = 1, Border = 2}
     enum TypeShare {Out, In, Border}
     struct ShareStruct {
         address accountFrom;
@@ -346,7 +336,36 @@ contract Moviment {
         uint256 indexTo;
         TypeShare accountType;
     }
-    ShareStruct[] public ownerShare;
+    
+    struct PaymentStruct {
+        uint256 total;
+        uint256 borderTotal;
+        uint256 accountInTotal;
+        bool payed;
+        bool borderPayed;
+        bool accountInPayed;
+    }
+
+    // function decimalpercent() external pure returns (uint256) {
+    //     //uint256 constant decimalpercent = 10000;              //100.00 = precisão da porcentagem (2) + 2 casas para 100%
+    //     return 10000;
+    // }
+
+}
+
+contract Moviment {
+    using SafeMath for uint256;
+    // Syntropy By Solange Gueiros
+    
+    string public name;
+    address public creator;
+    uint256 internal constant decimalpercent = 10000;              //100.00 = precisão da porcentagem (2) + 2 casas para 100%
+    uint32  public constant MaxAccountIn = 277;             //Número máximo de transferencias / depósitos em batch
+    
+    BorderFactory public borderFactory;                 //From BorderFactory
+    address public usdAddress;
+
+    SyntropyStruct.ShareStruct[] public ownerShare;
     mapping (address => mapping (address => uint256)) public shareIndex;  //para cada AC1 AC2 guarda o indice da struct onde estao as informacoes
     mapping (address => uint256[]) public indexFrom;   //Guarda os indices da struct onde o endereço envia o share
     mapping (address => uint256[]) public indexTo;     //Guarda os indices da struct onde o endereço recebe o share
@@ -355,11 +374,11 @@ contract Moviment {
     mapping (address => uint256) public indexBorder;    //borda que recebe deste movimento - posicao no array
 
     address[] public accountsIn;                            //Accounts que recebem deste movimento - por dentro - o movimento faz o pagamento
-    mapping (address => uint256) public indexAccountIn;    //AccountsIn - posicao no array
-    mapping (address => uint256) public countAccountIn;    //AccountsIn - quantos do IndexTo para Account são IN
+    mapping (address => uint256) internal indexAccountIn;    //AccountsIn - posicao no array
+    mapping (address => uint256) internal countAccountIn;    //AccountsIn - quantos do IndexTo para Account são IN
     mapping (address => uint256) public _balances;         //Saldo disponivel em USD que cada account pode retirar
 
-
+    //mapping (address => SyntropyStruct.PaymentStruct) public payments;    // out of gas
 
     constructor(string memory _name, address _borderFactory, address _usdAddress, address _ownerAddress) public {
         creator = _ownerAddress;
@@ -371,24 +390,24 @@ contract Moviment {
         owners.push(address(0x0));  //posicao 0 zerada
         indexOwner[_ownerAddress] = owners.push(_ownerAddress)-1;
 
-        addShareStruct(address(0x0), address(0x0), 0, TypeShare.Out);  //posicao 0 zerada
-        addShareStruct(_ownerAddress, _ownerAddress, decimalpercent, TypeShare.Out);
+        addShareStruct(address(0x0), address(0x0), 0, SyntropyStruct.TypeShare.Out);  //posicao 0 zerada
+        addShareStruct(_ownerAddress, _ownerAddress, decimalpercent, SyntropyStruct.TypeShare.Out);
     }
 
-    function addShareStruct (address _accountFrom, address _accountTo, uint256 _ratio, TypeShare _accountType) internal returns (uint256 index) {
+    function addShareStruct (address _accountFrom, address _accountTo, uint256 _ratio, SyntropyStruct.TypeShare _accountType) internal returns (uint256 index) {
       //Verifica se já existe ownerShare para _accountFrom e _accountTo.
       require (shareIndex[_accountFrom][_accountTo] == 0, "ownerShare exists");
 
       uint256 posIndexFrom = indexFrom[_accountFrom].push(index) - 1;  //index = 0 aqui, só descobre qual é a posição no indexFrom
       uint256 posIndexTo = indexTo[_accountTo].push(index) - 1;
 
-      ShareStruct memory s1 = ShareStruct({
+      SyntropyStruct.ShareStruct memory s1 = SyntropyStruct.ShareStruct({
           accountFrom: _accountFrom,
           accountTo: _accountTo,
-          accountType: _accountType,
           ratio: _ratio,
           indexFrom: posIndexFrom,
-          indexTo: posIndexTo
+          indexTo: posIndexTo,
+          accountType: _accountType
       });
       index = ownerShare.push(s1) - 1;
       shareIndex[_accountFrom][_accountTo] = index;
@@ -407,6 +426,7 @@ contract Moviment {
         ownerShare[_index].accountFrom = ownerShare[keyToMove].accountFrom;
         ownerShare[_index].accountTo = ownerShare[keyToMove].accountTo;
         ownerShare[_index].ratio = ownerShare[keyToMove].ratio;
+        ownerShare[_index].accountType = ownerShare[keyToMove].accountType;     //ARRUMAR NAS OUTRAS VERSOES
 
         //Atualiza o index do From
         indexFrom[ownerShare[keyToMove].accountFrom][ownerShare[keyToMove].indexFrom] = _index;
@@ -426,17 +446,30 @@ contract Moviment {
         return true;
     }
 
-    function countIndexFrom(address _address) public view returns (uint256) {
-        return indexFrom[_address].length;
+    // function countIndexFrom(address _address) public view returns (uint256) {
+    //     return indexFrom[_address].length;
+    // }
+
+    // function countIndexTo(address _address) public view returns (uint256) {
+    //     return indexTo[_address].length;
+    // }
+
+    // function countAccountsIn() public view returns (uint256) {
+    //     return accountsIn.length;
+    // }
+
+    function listAccountsIn() external view returns (address[] memory) {
+        return accountsIn;
     }
 
-    function countIndexTo(address _address) public view returns (uint256) {
-        return indexTo[_address].length;
+    function listIndexTo(address _address) external view returns (uint256[] memory) {
+        return indexTo[_address];
     }
 
-    function countAccountsIn() public view returns (uint256) {
-        return accountsIn.length;
+    function listIndexFrom(address _address) external view returns (uint256[] memory) {
+        return indexFrom[_address];
     }
+
 
     //SHARES
     function ratioShare (address accountFrom, address accountTo) public view returns (uint256) {
@@ -451,22 +484,22 @@ contract Moviment {
     event ShareDecrease (address indexed _from, address indexed _to, uint256 _ratio);
 
     function shareIncrease(address _account, uint _ratio) public onlyOwner {
-        TypeShare _accountType;
+        SyntropyStruct.TypeShare _accountType;
 
         if (isBorder(_account) && !inBorderList(_account)) {
         //if (isBorder(_account)) {
-            _accountType = TypeShare.Border;
+            _accountType = SyntropyStruct.TypeShare.Border;
         }
         else
         {
-            _accountType = TypeShare.Out;
+            _accountType = SyntropyStruct.TypeShare.Out;
         }
 
         _shareIncrease(_account, _ratio, _accountType);
         delete _accountType;
     }
 
-    function _shareIncrease(address _account, uint _ratio, TypeShare _accountType) internal {
+    function _shareIncrease(address _account, uint _ratio, SyntropyStruct.TypeShare _accountType) internal {
         uint256 from = shareIndex[msg.sender][msg.sender];
         uint256 ratio = ownerShare[from].ratio;
         require(ratio >= _ratio, "greater than owner share");
@@ -481,17 +514,16 @@ contract Moviment {
         }
         else {
           //Se msg.sender não share com _account ainda, adiciona _account
-          if (_accountType == TypeShare.Border) {
-          //if (isBorder(_account)) {
+          if (_accountType == SyntropyStruct.TypeShare.Border) {
             //Se a borda não está na lista de bordas que recebe do movimento (array borders), adiciona
             if (indexTo[_account].length == 0) {
                 addBorder(_account);
             }
-            to = addShareStruct(msg.sender, _account,  _ratio, TypeShare.Border);
+            to = addShareStruct(msg.sender, _account,  _ratio, SyntropyStruct.TypeShare.Border);
           }
           else
           {
-            if (_accountType == TypeShare.In) {
+            if (_accountType == SyntropyStruct.TypeShare.In) {
                 //Se account não está na lista de AccountIn que recebe do movimento (array AccountsIn), adiciona
                 if (countAccountIn[_account] == 0) {
                     addAccountIn(_account);
@@ -525,18 +557,18 @@ contract Moviment {
         }
         else {
             //Se msg.sender não tinha mais share, adiciona
-            from = addShareStruct(msg.sender, msg.sender,  _ratio, TypeShare.Out);
+            from = addShareStruct(msg.sender, msg.sender,  _ratio, SyntropyStruct.TypeShare.Out);
         }
 
         if (ownerShare[to].ratio == 0) {
-            TypeShare accountType = ownerShare[to].accountType;
+            SyntropyStruct.TypeShare accountType = ownerShare[to].accountType;
             //_account não tem mais share, retira do array de structs
             delShareStruct(to);
             //é uma borda e não recebe de mais ninguem
             if (inBorderList(_account) && indexTo[_account].length == 0 ) {
                 removeBorder(_account);
             }
-            if (accountType == TypeShare.In) {
+            if (accountType == SyntropyStruct.TypeShare.In) {
                 countAccountIn[_account] --;
                 if (countAccountIn[_account] == 0)  {
                     removeAccountIn(_account);
@@ -546,7 +578,7 @@ contract Moviment {
         emit ShareDecrease(msg.sender, _account, _ratio);
         delete from;
         delete to;
-        delete ratio;        
+        delete ratio;
     }
 
 
@@ -611,7 +643,7 @@ contract Moviment {
           ownerShare[to].ratio = ownerShare[to].ratio.add(_ratio);
         }
         else {
-            to = addShareStruct(_account, _account,  _ratio, TypeShare.Out);
+            to = addShareStruct(_account, _account,  _ratio, SyntropyStruct.TypeShare.Out);
             addOwner(_account);
         }
 
@@ -632,7 +664,7 @@ contract Moviment {
 
 
     //BORDERS
-    function inBorderList (address _address) public view returns (bool) {
+    function inBorderList (address _address) internal view returns (bool) {
         if (indexBorder[_address] > 0)
             return true;
         else
@@ -641,6 +673,10 @@ contract Moviment {
 
     function isBorder (address _address) public view returns (bool) {
         return borderFactory.inBorderFactory (_address);
+    }
+
+    function listBorders() public view returns (address[] memory) {
+        return borders;
     }
 
     event AddBorder (address indexed _address);
@@ -668,9 +704,6 @@ contract Moviment {
         return true;
     }
 
-    function listBorders() public view returns (address[] memory) {
-        return borders;
-    }
 
     //ACCOUNTINs
     event AddAccountIn (address indexed _address);
@@ -755,8 +788,8 @@ contract Moviment {
     function shareIncreaseIn(address _account, uint _ratio) public onlyOwner {
         require (!isBorder(_account), "is border");
 
-        TypeShare _accountType;
-        _accountType = TypeShare.In;
+        SyntropyStruct.TypeShare _accountType;
+        _accountType = SyntropyStruct.TypeShare.In;
         _shareIncrease(_account, _ratio, _accountType);
     }
 
@@ -807,71 +840,169 @@ contract Moviment {
         delete value;
     }
 
+}
+
+contract MovimentView {
+    using SafeMath for uint256;
+    // Syntropy By Solange Gueiros
+
+    uint256 constant decimalpercent = 10000;              //100.00 = precisão da porcentagem (2) + 2 casas para 100%
 
     /*
-    event Incoming(address indexed from, uint256 value, string description);
-    event AnnounceBorderIncoming(address indexed from, address indexed to, uint256 value, string description);
-    event AnnounceShareIncoming(address indexed from, address indexed to, uint256 value, TypeShare accountType, string description);
+    function test (address _movAddress) public view returns (uint256) {
+        Moviment moviment = Moviment (_movAddress);
+        address[] memory borders;
+        borders = moviment.listBorders();
 
-    function reportIncoming (uint256 _value, string memory _description) public onlyOwner {
+        uint256[] memory indexTo;
+        indexTo = moviment.listIndexTo(borders[1]);
 
-        emit Incoming(msg.sender, _value, _description);
+        //uint256 value = moviment.ratioShare()
+        //ShareStruct memory share = moviment.ownerShare(indexTo[0]);
+        //ShareStruct memory share = moviment.getStructOwnerShare(2);
 
-        uint256 index = 0;
-        uint256 value = 0;
-        address from = address(0x0);
-        address to = address(0x0);
-        TypeShare accountType = TypeShare.Out;
+        //returns (address accountFrom, address accountTo, uint256 ratio, uint256 indexFrom, uint256 indexTo, TypeShare accountType)
+        //return (ownerShare[_index].accountFrom, ownerShare[_index].accountTo,
+        //    ownerShare[_index].ratio, ownerShare[_index].indexFrom, ownerShare[_index].indexTo, ownerShare[_index].accountType);
 
-        for (uint256 o = 1; o < owners.length; o++) {
-            //Structs para quem o owner envia
-            for (uint256 f = 0; f < indexFrom[owners[o]].length; f++) {
-                index = indexFrom[owners[o]][f];
-                value = ownerShare[index].ratio.mul(_value).div(decimalpercent);
-                from = ownerShare[index].accountFrom;
-                to = ownerShare[index].accountTo;
-                accountType = ownerShare[index].accountType;
-                if (inBorderList(to))
-                    emit AnnounceBorderIncoming (from, to, value, _description);
-                else
-                    emit AnnounceShareIncoming (from, to, value, accountType, _description);
-            }
-        }
+        //uint256 total = 0;
+
+        //return share.ratio;
+        return indexTo[0];
     }
 
+    */
 
-    //Se eu receber XXX, quanto tenho que enviar para as bordas e accountIns, seja em meu nome ou em nome dos outros?
-    function getTransferAmount (uint256 _total) public view returns (uint256 totalBorders, uint256 totalAccountIns) {
+    function listIndexFrom (address _movAddress, address _indexAddress) public view returns (uint256[] memory) {
+        Moviment moviment = Moviment (_movAddress);
+        uint256[] memory indexFrom;
+        indexFrom = moviment.listIndexTo(_indexAddress);
+        return indexFrom;
+    }
+
+    function listIndexTo (address _movAddress, address _indexAddress) public view returns (uint256[] memory) {
+        Moviment moviment = Moviment (_movAddress);
+        uint256[] memory indexTo;
+        indexTo = moviment.listIndexTo(_indexAddress);
+        return indexTo;
+    }
+
+    function listBorders (address _movAddress) public view returns (address[] memory) {
+        Moviment moviment = Moviment (_movAddress);
+        address[] memory borders;
+        borders = moviment.listBorders();
+        return borders;
+    }
+
+    function inBorderList (address _movAddress, address _borderAddress) public view returns (bool) {
+        Moviment moviment = Moviment (_movAddress);
+
+        if (moviment.indexBorder(_borderAddress) > 0)
+            return true;
+        else
+            return false;
+    }
+
+    function getStructOwnerShare (address _movAddress, uint256 _index) public view
+        returns (address accountFrom, address accountTo, uint256 ratio, uint256 indexFrom, uint256 indexTo, SyntropyStruct.TypeShare accountType) {
+
+        Moviment moviment = Moviment (_movAddress);
+        (accountFrom, accountTo, ratio, indexFrom, indexTo, accountType) = moviment.ownerShare(_index);
+        return (accountFrom, accountTo, ratio, indexFrom, indexTo, accountType);
+    }
+
+    function getBorderAmount (address _movAddress, uint256 _total) public view returns (uint256) {
+        Moviment moviment = Moviment (_movAddress);
         uint256 total = 0;
 
         //Borders
+        address[] memory borders;
+        borders = moviment.listBorders();
         for (uint256 b = 1; b < borders.length; b++) {
             //Structs de quem a borda recebe
-            for (uint256 t = 0; t < indexTo[borders[b]].length; t++) {
-                uint256 index = indexTo[borders[b]][t];
-                uint256 value = ownerShare[index].ratio.mul(_total).div(decimalpercent);
+            uint256[] memory indexTo;
+            indexTo = moviment.listIndexTo(borders[b]);
+            for (uint256 t = 0; t < indexTo.length; t++) {
+                (, , uint256 ratio, , , ) = moviment.ownerShare(indexTo[t]);
+                //uint256 ratio = moviment.ratioShareByIndex(indexTo[t]);
+                uint256 value = ratio.mul(_total).div(decimalpercent);
                 total = total.add(value);
             }
         }
-        totalBorders = total;
+        return total;
+    }
+
+    function getAccountInAmount (address _movAddress, uint256 _total) public view returns (uint256) {
+        Moviment moviment = Moviment (_movAddress);
+        uint256 total = 0;
 
         //AccountIns
-        total = 0;
-        for (uint256 a = 1; a < accountsIn.length; a++) {
-            //Structs de quem a accountIN recebe
-            for (uint256 t = 0; t < indexTo[accountsIn[a]].length; t++) {
-                uint256 index = indexTo[accountsIn[a]][t];
-                uint256 value = ownerShare[index].ratio.mul(_total).div(decimalpercent);
+        address[] memory accountIns;
+        accountIns = moviment.listAccountsIn();
+        for (uint256 b = 1; b < accountIns.length; b++) {
+            uint256[] memory indexTo;
+            indexTo = moviment.listIndexTo(accountIns[b]);
+            for (uint256 t = 0; t < indexTo.length; t++) {
+                //uint256 ratio = moviment.ratioShareByIndex(indexTo[t]);
+                (, ,uint256 ratio, , , ) = moviment.ownerShare(indexTo[t]);
+                uint256 value = ratio.mul(_total).div(decimalpercent);
                 total = total.add(value);
             }
         }
-        totalAccountIns = total;
+        return total;
+    }
+
+    //Se eu receber XXX, quanto tenho que enviar para as bordas e accountIns, seja em meu nome ou em nome dos outros?
+    function getTransferAmount (address _movAddress, uint256 _total) public view returns (uint256 totalBorders, uint256 totalAccountIns) {
+        totalBorders = getBorderAmount(_movAddress, _total);
+
+        totalAccountIns = getAccountInAmount(_movAddress, _total);
 
         return (totalBorders, totalAccountIns) ;
     }
-    */
 
 
+    modifier onlyOwner (address _movAddress) {
+        _onlyOwner(_movAddress);
+        _;
+    }
+    function _onlyOwner (address _movAddress) internal view {
+        Moviment moviment = Moviment (_movAddress);
+
+        require(moviment.indexOwner(msg.sender) > 0, "only owner");
+    }
+
+    event Incoming(address indexed moviment, address indexed from, uint256 value, string description);
+    event AnnounceBorderIncoming(address indexed moviment, address indexed from, address indexed to, uint256 value, string description);
+    event AnnounceShareIncoming(address indexed moviment, address indexed from, address indexed to,
+                                uint256 value, SyntropyStruct.TypeShare accountType, string description);
+
+    //function reportIncoming (address _movAddress, uint256 _value, string memory _description) public onlyOwner {
+    function reportIncoming (address _movAddress, uint256 _total, string memory _description) public onlyOwner(_movAddress) {
+        Moviment moviment = Moviment (_movAddress);
+        emit Incoming(_movAddress, msg.sender, _total, _description);
+
+        address to;
+        uint256 value;
+        SyntropyStruct.TypeShare accountType;
+
+        address[] memory owners = moviment.listOwners();
+
+        for (uint256 o = 1; o < owners.length; o++) {
+            //Structs para quem o owner envia
+            uint256[] memory indexFrom = moviment.listIndexFrom(owners[o]);
+            
+            for (uint256 f = 0; f < indexFrom.length; f++) {
+                (, to, value, , , accountType) = moviment.ownerShare(indexFrom[f]);
+                value = value.mul(_total).div(decimalpercent);
+
+                if (accountType == SyntropyStruct.TypeShare.Border)
+                    emit AnnounceBorderIncoming (_movAddress, owners[o], to, value, _description);
+                else
+                    emit AnnounceShareIncoming (_movAddress, owners[o], to, value, accountType, _description);
+            }
+        }
+    }
 
 }
 
