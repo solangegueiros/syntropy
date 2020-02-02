@@ -3,6 +3,7 @@ const Border = artifacts.require("Border");
 const BorderFactory = artifacts.require("BorderFactory");
 const Moviment = artifacts.require("Moviment");
 const MovimentFactory = artifacts.require("MovimentFactory");
+const MovimentView = artifacts.require("MovimentView");
 
 module.exports = async (deployer, network, accounts)=> {
 
@@ -19,7 +20,10 @@ module.exports = async (deployer, network, accounts)=> {
     console.log("movimentFactory: " + movimentFactory.address);
     //console.log(await movimentFactory.borderFactory.call());
 
+    movimentView = await deployer.deploy(MovimentView, {from: accounts[0]});  
+    console.log("movimentView: " + movimentView.address);
 
+    
     name = "Border 01";
     border01 = await borderFactory.createBorder (name, {from: accounts[1]});
     //console.log("border: " + border);    
