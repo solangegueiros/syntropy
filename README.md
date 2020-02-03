@@ -12,6 +12,8 @@ npm run dev
 ## Ropsten addresses
 
 ### USD Syntropy - UsdS
+https://oneclickdapp.com/opera-asia/
+
 0xf8df9806F4Ce1677c500fa90E10A4A568F78c353
 
 https://ropsten.etherscan.io/address/0xf8df9806f4ce1677c500fa90e10a4a568f78c353#readContract
@@ -20,29 +22,35 @@ https://ropsten.etherscan.io/address/0xf8df9806f4ce1677c500fa90e10a4a568f78c353#
 
 
 ### Border Factory
-0x54643899fe772179cA6580411419B0e2e9019A22
+https://oneclickdapp.com/cotton-strange/
 
-https://ropsten.etherscan.io/address/0x54643899fe772179ca6580411419b0e2e9019a22#readContract
+0x727Ce35e67977e97565902B4E9cd25FeeBe54dcd
 
-https://ropsten.etherscan.io/address/0x54643899fe772179ca6580411419b0e2e9019a22#writeContract
+https://ropsten.etherscan.io/address/0x727ce35e67977e97565902b4e9cd25feebe54dcd#readContract
+
+https://ropsten.etherscan.io/address/0x727ce35e67977e97565902b4e9cd25feebe54dcd#writeContract
 
 
 
 ### Moviment Factory
-0xE43E56537Bb58931422925F79B36C1aeF6953B19
+https://oneclickdapp.com/matrix-prague/
 
-https://ropsten.etherscan.io/address/0xe43e56537bb58931422925f79b36c1aef6953b19#readContract
+0x3c7AA49D2Cc00a0F84C642E462318bf113E9EE8B
 
-https://ropsten.etherscan.io/address/0xe43e56537bb58931422925f79b36c1aef6953b19#writeContract
+https://ropsten.etherscan.io/address/0x3c7aa49d2cc00a0f84c642e462318bf113e9ee8b#readContract
+
+https://ropsten.etherscan.io/address/0x3c7aa49d2cc00a0f84c642e462318bf113e9ee8b#writeContract
 
 
 
 ### Moviment View
-0x9d285e64a5b202477519B78FB023d9B5e1fd7f6a
+https://oneclickdapp.com/mary-heart/
 
-https://ropsten.etherscan.io/address/0x9d285e64a5b202477519b78fb023d9b5e1fd7f6a#readContract
+0x04BeF564E8ead8E5006c5C09510986333ef5557A
 
-https://ropsten.etherscan.io/address/0x9d285e64a5b202477519b78fb023d9b5e1fd7f6a#writeContract
+https://ropsten.etherscan.io/address/0x04bef564e8ead8e5006c5c09510986333ef5557a#readContract
+
+https://ropsten.etherscan.io/address/0x04bef564e8ead8e5006c5c09510986333ef5557a#writeContract
 
 
 
