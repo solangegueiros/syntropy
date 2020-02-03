@@ -1,8 +1,7 @@
 pragma solidity 0.5.11;
-//pragma experimental ABIEncoderV2;
 
 // Syntropy By Solange Gueiros
-// versao 0.3.1
+// versao 0.3.2
 
 
 contract Token {
@@ -132,12 +131,12 @@ contract Border {
     uint8  public constant MaxAccount = 49;                //Número máximo de transferencias / depósitos em batch
 
     mapping (address => uint256) public ratioOwner;
-    address[] public owners;
-    mapping (address => uint256) public indexOwner;     //posicao no array
+    address[] private owners;
+    mapping (address => uint256) private indexOwner;     //posicao no array
 
     uint256 public totalRatio;                           //totalSupply do token
-    uint256 public _valueDeposited;                     //Valor que será dividido de acordo com o shareRatio
-    mapping (address => uint256) public _balances;      //Saldo disponivel em USD que cada pessoa pode retirar
+    uint256 private _valueDeposited;                     //Valor que será dividido de acordo com o shareRatio
+    mapping (address => uint256) private _balances;      //Saldo disponivel em USD que cada pessoa pode retirar
 
 
     constructor(string memory _name, address _usdAddress, address _ownerAddress) public {
@@ -146,6 +145,8 @@ contract Border {
         usdAddress = _usdAddress;
         totalRatio = 0;
         _valueDeposited = 0;
+        owners.push(address(0x0));  //posicao 0 zerada
+
     }
 
     function listOwners() public view returns (address[] memory) {
@@ -159,12 +160,8 @@ contract Border {
             return false;
     }
 
-    function getIndexOwner(uint256 i) public view returns (address) {
-        return owners[i];
-    }
-
     function countOwners() public view returns (uint256) {
-        return owners.length;
+        return owners.length-1;
     }
 
     function _addOwner(address account, uint256 shareRatio) internal returns (bool) {
@@ -201,28 +198,30 @@ contract Border {
 
     event DepositUSD(uint256 _totalValue, address[] indexed _froms, uint256[] _values);
 
-    function depositUSD(uint256 _totalValue, address[] memory _froms, uint256[] memory _values) public {
+    function depositUSD(uint256 _totalValue, address[] calldata _froms, uint256[] calldata _values) external {
+        //function depositUSD(uint256 _totalValue, address[] memory _froms, uint256[] memory _values) public {
         require(_froms.length == _values.length, "number froms and values don't match");
         require(_froms.length < MaxAccount, "too many recipients");
 
 
         UsdS usdS = UsdS(usdAddress);
         //A soma dos valores não pode ser maior que o allowance
-        require(_totalValue >= usdS.allowance(msg.sender, address(this)), "ammount not approved");
+        require(usdS.allowance(msg.sender, address(this)) >= _totalValue, "ammount not approved");
         require(usdS.transferFrom(msg.sender, address(this), _totalValue), "Can't transfer to border");
 
         emit DepositUSD(_totalValue, _froms, _values);
 
 
-        if (owners.length == 0) {
+        if (owners.length == 1) {
+            //Só tem a primeira posicao zerada,
             for (uint256 i = 0; i < _froms.length; i++) {
                 _balances[_froms[i]] = _balances[_froms[i]].add(_values[i]);
             }
         }
         else {
              _valueDeposited = _totalValue;
-            for (uint256 i = 0; i < owners.length; i++) {
-                _releaseUSD(owners[i]);
+            for (uint256 i = 1; i < owners.length; i++) {
+                _receiveUSD(owners[i]);
             }
             _valueDeposited = 0;
         }
@@ -232,14 +231,14 @@ contract Border {
         }
     }
 
-    event ReleaseUSD(address indexed to, uint256 value);
+    event ReceiveUSD(address indexed to, uint256 value);
 
-    function _releaseUSD(address account) internal {
+    function _receiveUSD(address account) internal {
         require(ratioOwner[account] > 0, "no shares");
 
         uint256 payment = _valueDeposited.mul(ratioOwner[account]).div(totalRatio);
         _balances[account] = _balances[account].add(payment);
-        emit ReleaseUSD(account, payment);
+        emit ReceiveUSD(account, payment);
     }
 
     //Balance USD in the contract in behalf of account
@@ -258,31 +257,32 @@ contract Border {
         delete value;
     }
 
-    //Token Border equivalent
-    function ratioOf(address account) public view returns (uint256) {
+    //Token Border equivalent - % da conta em relação ao total da borda
+    function percOf(address account) public view returns (uint256) {
         uint256 value = decimalpercent.mul(ratioOwner[account]).div(totalRatio);
         return value;
     }
 
     event TransferRatio(address indexed from, address indexed to, uint256 value);
 
-    //Transfer a amount of your part in Border to another account
-    function transferRatio(address account, uint256 shareRatio) public {
+    //Transfer a perc (based in total) in Border to another account
+    function transferRatio(address account, uint256 perc) public {
         require(account != address(0), "zero address");
-        require(shareRatio > 0, "shares are 0");
+        require((perc > 0 && perc <= percOf(msg.sender) ), "invalid perc");
 
-        //Não estou verificado se ele quer transferir mais do que tem, simplesmente vai dar erro no sub.
-        uint256 newRatio = ratioOwner[msg.sender].sub(shareRatio);
+        //Calcular o ratio em relacao a perc
+        uint256 ratio = ratioOwner[msg.sender].mul(perc).div(percOf(msg.sender));
+        uint256 newRatio = ratioOwner[msg.sender].sub(ratio);
 
         //Se ratioOwner[msg.sender] = 0, retiro do array para não passar por ele sem necessidade
         if (newRatio == 0) {
             require(_removeOwner(msg.sender), "removeOwner error");
-            //_removeOwner(msg.sender);
         }
 
         ratioOwner[msg.sender] = newRatio;
-        _addOwner(account, shareRatio);
-        emit TransferRatio (msg.sender, account, shareRatio);
+        totalRatio = totalRatio.sub(ratio);
+        _addOwner(account, ratio);
+        emit TransferRatio (msg.sender, account, perc);
     }
 
 }
