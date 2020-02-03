@@ -486,8 +486,7 @@ contract Moviment {
     function shareIncrease(address _account, uint _ratio) public onlyOwner {
         SyntropyStruct.TypeShare _accountType;
 
-        if (isBorder(_account) && !inBorderList(_account)) {
-        //if (isBorder(_account)) {
+        if (isBorder(_account)) {
             _accountType = SyntropyStruct.TypeShare.Border;
         }
         else
@@ -739,6 +738,15 @@ contract Moviment {
         return true;
     }
 
+    function shareIncreaseIn(address _account, uint _ratio) public onlyOwner {
+        require (!isBorder(_account), "is border");
+
+        SyntropyStruct.TypeShare _accountType;
+        _accountType = SyntropyStruct.TypeShare.In;
+        _shareIncrease(_account, _ratio, _accountType);
+    }
+    
+
     // borderTransfer
     address[] private borderFroms;
     uint256[] private borderValues;
@@ -784,14 +792,7 @@ contract Moviment {
     }
 
 
-    // ACCOUNTS IN
-    function shareIncreaseIn(address _account, uint _ratio) public onlyOwner {
-        require (!isBorder(_account), "is border");
 
-        SyntropyStruct.TypeShare _accountType;
-        _accountType = SyntropyStruct.TypeShare.In;
-        _shareIncrease(_account, _ratio, _accountType);
-    }
 
     event Transfer(address indexed from, address indexed to, uint256 value);
 
